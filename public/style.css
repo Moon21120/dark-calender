@@ -1,1749 +1,648 @@
-const STORAGE_KEY = "darkCalendarData";
-
-const state = {
-  currentDate: new Date(),
-  events: [],
-  countdowns: [],
-  removedHolidays: [],
-  settings: {
-    notifications: true
-  }
-};
-
-const HOLIDAYS = [
-  {
-    id: "new-years",
-    name: "New Year's Day",
-    month: 0,
-    day: 1
-  },
-  {
-    id: "easter",
-    name: "Easter",
-    dynamic: "easter"
-  },
-  {
-    id: "halloween",
-    name: "Halloween",
-    month: 9,
-    day: 31
-  },
-  {
-    id: "thanksgiving",
-    name: "Thanksgiving",
-    dynamic: "thanksgiving"
-  },
-  {
-    id: "christmas",
-    name: "Christmas",
-    month: 11,
-    day: 25
-  }
-];
-
-const monthTitle = document.getElementById("monthTitle");
-const todayLabel = document.getElementById("todayLabel");
-const calendarGrid = document.getElementById("calendarGrid");
-const upcomingEvents = document.getElementById("upcomingEvents");
-const countdownList = document.getElementById("countdownList");
-
-let selectedDayKey = null;
-
-/* =========================================================
-   STORAGE
-========================================================= */
-
-function loadData() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-
-    if (!saved) return;
-
-    const data = JSON.parse(saved);
-
-    state.events = Array.isArray(data.events)
-      ? data.events
-      : [];
-
-    state.countdowns = Array.isArray(data.countdowns)
-      ? data.countdowns
-      : [];
-
-    state.removedHolidays = Array.isArray(
-      data.removedHolidays
-    )
-      ? data.removedHolidays
-      : [];
-
-    if (data.settings) {
-      state.settings = {
-        ...state.settings,
-        ...data.settings
-      };
-    }
-  } catch (error) {
-    console.error(
-      "Could not load calendar data:",
-      error
-    );
-  }
+:root {
+  --bg: #060a12;
+  --panel: #0b111d;
+  --panel-2: #0f1725;
+  --border: rgba(107, 139, 181, 0.2);
+  --text: #f4f7fb;
+  --muted: #8e9bad;
+  --blue: #6f9fe8;
+  --green: #72d9a0;
+  --danger: #e87878;
 }
 
-function saveData() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      events: state.events,
-      countdowns: state.countdowns,
-      removedHolidays:
-        state.removedHolidays,
-      settings: state.settings
-    })
-  );
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* =========================================================
-   DATE HELPERS
-========================================================= */
-
-function formatDateKey(date) {
-  const year = date.getFullYear();
-
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, "0");
-
-  const day = String(
-    date.getDate()
-  ).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "Segoe UI",
+    sans-serif;
 }
 
-function parseDateKey(key) {
-  const [year, month, day] =
-    key.split("-").map(Number);
-
-  return new Date(
-    year,
-    month - 1,
-    day
-  );
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
-function isSameDay(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+button {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
-function getToday() {
-  return new Date();
+#app {
+  width: 100%;
+  max-width: 700px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding-bottom: 100px;
 }
 
-/* =========================================================
-   HOLIDAYS
-========================================================= */
+/* HEADER */
 
-function getEasterDate(year) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-
-  const h =
-    (19 * a +
-      b -
-      d -
-      g +
-      15) %
-    30;
-
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-
-  const l =
-    (32 +
-      2 * e +
-      2 * i -
-      h -
-      k) %
-    7;
-
-  const m = Math.floor(
-    (a +
-      11 * h +
-      22 * l) /
-      451
-  );
-
-  const month = Math.floor(
-    (h +
-      l -
-      7 * m +
-      114) /
-      31
-  );
-
-  const day =
-    ((h +
-      l -
-      7 * m +
-      114) %
-      31) +
-    1;
-
-  return new Date(
-    year,
-    month - 1,
-    day
-  );
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 20px 16px;
 }
 
-function getThanksgivingDate(year) {
-  const date = new Date(
-    year,
-    10,
-    1
-  );
-
-  while (date.getDay() !== 4) {
-    date.setDate(
-      date.getDate() + 1
-    );
-  }
-
-  date.setDate(
-    date.getDate() + 21
-  );
-
-  return date;
+.topbar h1 {
+  margin: 0;
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
 }
 
-function getHolidayDate(
-  holiday,
-  year
-) {
-  if (
-    holiday.dynamic ===
-    "easter"
-  ) {
-    return getEasterDate(year);
-  }
-
-  if (
-    holiday.dynamic ===
-    "thanksgiving"
-  ) {
-    return getThanksgivingDate(year);
-  }
-
-  return new Date(
-    year,
-    holiday.month,
-    holiday.day
-  );
+.topbar p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
-function getHolidayEventsForYear(
-  year
-) {
-  return HOLIDAYS
-    .filter(
-      holiday =>
-        !state.removedHolidays.includes(
-          holiday.id
-        )
-    )
-    .map(holiday => {
-      const date =
-        getHolidayDate(
-          holiday,
-          year
-        );
-
-      return {
-        id: `holiday-${holiday.id}-${year}`,
-        holidayId:
-          holiday.id,
-        name: holiday.name,
-        date:
-          formatDateKey(date),
-        holiday: true
-      };
-    });
+.icon-button {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 18px;
 }
 
-/* Only holidays from the displayed year */
-function getAllEvents() {
-  const year =
-    state.currentDate.getFullYear();
+/* SCREENS */
 
-  const holidays =
-    getHolidayEventsForYear(
-      year
-    );
-
-  return [
-    ...state.events,
-    ...holidays
-  ];
+.screen {
+  display: none;
+  padding: 8px 16px 20px;
 }
 
-function getEventsForDate(date) {
-  const key =
-    formatDateKey(date);
-
-  return getAllEvents().filter(
-    event =>
-      event.date === key
-  );
+.screen.active {
+  display: block;
 }
 
-/* =========================================================
-   CALENDAR
-========================================================= */
+/* MONTH NAVIGATION */
 
-function renderCalendar() {
-  const year =
-    state.currentDate.getFullYear();
-
-  const month =
-    state.currentDate.getMonth();
-
-  monthTitle.textContent =
-    state.currentDate.toLocaleDateString(
-      undefined,
-      {
-        month: "long",
-        year: "numeric"
-      }
-    );
-
-  const today =
-    getToday();
-
-  todayLabel.textContent =
-    `Today · ${today.toLocaleDateString(
-      undefined,
-      {
-        month: "short",
-        day: "numeric"
-      }
-    )}`;
-
-  calendarGrid.innerHTML = "";
-
-  const firstDay =
-    new Date(
-      year,
-      month,
-      1
-    );
-
-  const lastDay =
-    new Date(
-      year,
-      month + 1,
-      0
-    );
-
-  const previousMonthLastDay =
-    new Date(
-      year,
-      month,
-      0
-    ).getDate();
-
-  const startingDay =
-    firstDay.getDay();
-
-  const totalCells =
-    Math.ceil(
-      (startingDay +
-        lastDay.getDate()) /
-        7
-    ) * 7;
-
-  for (
-    let i = 0;
-    i < totalCells;
-    i++
-  ) {
-    let date;
-    let otherMonth = false;
-
-    if (i < startingDay) {
-      const day =
-        previousMonthLastDay -
-        startingDay +
-        i +
-        1;
-
-      date = new Date(
-        year,
-        month - 1,
-        day
-      );
-
-      otherMonth = true;
-    } else if (
-      i >=
-      startingDay +
-        lastDay.getDate()
-    ) {
-      const day =
-        i -
-        startingDay -
-        lastDay.getDate() +
-        1;
-
-      date = new Date(
-        year,
-        month + 1,
-        day
-      );
-
-      otherMonth = true;
-    } else {
-      const day =
-        i -
-        startingDay +
-        1;
-
-      date = new Date(
-        year,
-        month,
-        day
-      );
-    }
-
-    const dayElement =
-      document.createElement(
-        "button"
-      );
-
-    dayElement.className =
-      "day";
-
-    if (otherMonth) {
-      dayElement.classList.add(
-        "other-month"
-      );
-    }
-
-    if (
-      isSameDay(
-        date,
-        today
-      )
-    ) {
-      dayElement.classList.add(
-        "today"
-      );
-    }
-
-    const events =
-      getEventsForDate(
-        date
-      );
-
-    if (events.length > 0) {
-      dayElement.classList.add(
-        "has-event"
-      );
-    }
-
-    if (
-      events.some(
-        event =>
-          event.holiday
-      )
-    ) {
-      dayElement.classList.add(
-        "holiday"
-      );
-    }
-
-    const number =
-      document.createElement(
-        "span"
-      );
-
-    number.className =
-      "day-number";
-
-    number.textContent =
-      date.getDate();
-
-    dayElement.appendChild(
-      number
-    );
-
-    dayElement.addEventListener(
-      "click",
-      () => {
-        handleDayClick(
-          date,
-          events
-        );
-      }
-    );
-
-    calendarGrid.appendChild(
-      dayElement
-    );
-  }
-
-  renderUpcoming();
-
-  renderDayDropdown();
+.calendar-navigation {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-/* =========================================================
-   DAY DROPDOWN
-========================================================= */
-
-function handleDayClick(
-  date,
-  events
-) {
-  const key =
-    formatDateKey(date);
-
-  if (events.length === 0) {
-    selectedDayKey = null;
-
-    renderDayDropdown();
-
-    showAddEventModal(date);
-
-    return;
-  }
-
-  if (
-    selectedDayKey === key
-  ) {
-    selectedDayKey = null;
-  } else {
-    selectedDayKey = key;
-  }
-
-  renderDayDropdown();
+.nav-button,
+.today-button {
+  height: 40px;
+  background: var(--panel);
+  border: 1px solid var(--border);
 }
 
-function renderDayDropdown() {
-  let existing =
-    document.querySelector(
-      ".day-dropdown"
-    );
-
-  if (existing) {
-    existing.remove();
-  }
-
-  if (!selectedDayKey) {
-    return;
-  }
-
-  const date =
-    parseDateKey(
-      selectedDayKey
-    );
-
-  const events =
-    getEventsForDate(
-      date
-    );
-
-  if (events.length === 0) {
-    return;
-  }
-
-  const dropdown =
-    document.createElement(
-      "div"
-    );
-
-  dropdown.className =
-    "day-dropdown";
-
-  const header =
-    document.createElement(
-      "div"
-    );
-
-  header.className =
-    "day-dropdown-header";
-
-  header.innerHTML = `
-    <div>
-      <strong>
-        ${date.toLocaleDateString(
-          undefined,
-          {
-            weekday:
-              "long",
-            month:
-              "long",
-            day: "numeric"
-          }
-        )}
-      </strong>
-
-      <span>
-        ${events.length}
-        ${events.length === 1
-          ? "event"
-          : "events"}
-      </span>
-    </div>
-
-    <button
-      class="day-dropdown-close"
-      aria-label="Close"
-    >
-      ×
-    </button>
-  `;
-
-  dropdown.appendChild(
-    header
-  );
-
-  const eventContainer =
-    document.createElement(
-      "div"
-    );
-
-  eventContainer.className =
-    "day-dropdown-events";
-
-  events.forEach(event => {
-    const item =
-      document.createElement(
-        "div"
-      );
-
-    item.className =
-      "day-dropdown-item";
-
-    const icon =
-      event.holiday
-        ? "★"
-        : "•";
-
-    item.innerHTML = `
-      <div class="day-dropdown-icon ${
-        event.holiday
-          ? "holiday-icon"
-          : ""
-      }">
-        ${icon}
-      </div>
-
-      <div class="day-dropdown-info">
-        <strong>
-          ${escapeHtml(
-            event.name
-          )}
-        </strong>
-
-        <span>
-          ${
-            event.holiday
-              ? "Holiday"
-              : event.time
-                ? event.time
-                : "All day"
-          }
-        </span>
-      </div>
-
-      ${
-        event.holiday
-          ? ""
-          : `
-            <button
-              class="day-event-delete"
-              aria-label="Delete event"
-              data-event-id="${event.id}"
-            >
-              ×
-            </button>
-          `
-      }
-    `;
-
-    eventContainer.appendChild(
-      item
-    );
-  });
-
-  dropdown.appendChild(
-    eventContainer
-  );
-
-  const addButton =
-    document.createElement(
-      "button"
-    );
-
-  addButton.className =
-    "day-dropdown-add";
-
-  addButton.textContent =
-    "+ Add event";
-
-  addButton.addEventListener(
-    "click",
-    () => {
-      showAddEventModal(
-        date
-      );
-    }
-  );
-
-  dropdown.appendChild(
-    addButton
-  );
-
-  const calendar =
-    document.querySelector(
-      ".calendar"
-    );
-
-  calendar.after(
-    dropdown
-  );
-
-  const closeButton =
-    dropdown.querySelector(
-      ".day-dropdown-close"
-    );
-
-  closeButton.addEventListener(
-    "click",
-    () => {
-      selectedDayKey = null;
-      renderDayDropdown();
-    }
-  );
-
-  dropdown
-    .querySelectorAll(
-      ".day-event-delete"
-    )
-    .forEach(button => {
-      button.addEventListener(
-        "click",
-        () => {
-          const eventId =
-            button.dataset
-              .eventId;
-
-          if (
-            confirm(
-              "Delete this event?"
-            )
-          ) {
-            state.events =
-              state.events.filter(
-                event =>
-                  event.id !==
-                  eventId
-              );
-
-            state.countdowns =
-              state.countdowns.filter(
-                countdown =>
-                  countdown.eventId !==
-                  eventId
-              );
-
-            saveData();
-
-            selectedDayKey =
-              null;
-
-            renderCalendar();
-            renderCountdowns();
-          }
-        }
-      );
-    });
+.nav-button {
+  border-radius: 12px;
+  font-size: 25px;
 }
 
-/* =========================================================
-   UPCOMING
-========================================================= */
+.today-button {
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
 
-function renderUpcoming() {
-  const today =
-    getToday();
+/* CALENDAR */
 
-  const todayStart =
-    new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
+.calendar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 14px 8px 12px;
+  overflow: hidden;
+}
 
-  const events =
-    getAllEvents()
-      .filter(event => {
-        const date =
-          parseDateKey(
-            event.date
-          );
+.weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
 
-        return date >=
-          todayStart;
-      })
-      .sort(
-        (a, b) =>
-          parseDateKey(
-            a.date
-          ) -
-          parseDateKey(
-            b.date
-          )
-      )
-      .slice(0, 8);
+.weekdays {
+  margin-bottom: 8px;
+}
 
-  upcomingEvents.innerHTML =
-    "";
+.weekdays span {
+  text-align: center;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
 
-  if (events.length === 0) {
-    upcomingEvents.innerHTML = `
-      <div class="empty-state">
-        Nothing coming up yet.
-      </div>
-    `;
+.calendar-grid {
+  row-gap: 3px;
+}
 
-    return;
+.day {
+  position: relative;
+  min-height: 56px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent;
+  color: var(--text);
+
+  border-radius: 12px;
+}
+
+.day-number {
+  width: 37px;
+  height: 37px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  font-size: 14px;
+
+  position: relative;
+  z-index: 2;
+}
+
+.day.today .day-number {
+  background: white;
+  color: #060a12;
+  font-weight: 700;
+}
+
+.day.other-month {
+  color: #394354;
+}
+
+.day.has-event::after {
+  content: "";
+
+  position: absolute;
+
+  bottom: 5px;
+
+  width: 5px;
+  height: 5px;
+
+  border-radius: 50%;
+
+  background: var(--blue);
+}
+
+.day.holiday::after {
+  background: var(--green);
+}
+
+/* UPCOMING */
+
+.upcoming {
+  margin-top: 26px;
+}
+
+.section-header,
+.screen-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-header h2,
+.screen-heading h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.small-add,
+.add-button {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.small-add {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 21px;
+}
+
+.event-list,
+.countdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.event-card,
+.countdown-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.event-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+}
+
+.event-date {
+  width: 44px;
+  height: 44px;
+
+  border-radius: 13px;
+  background: var(--panel-2);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+}
+
+.event-date strong {
+  font-size: 16px;
+}
+
+.event-date span {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.event-info {
+  min-width: 0;
+}
+
+.event-info strong {
+  display: block;
+  font-size: 14px;
+}
+
+.event-info span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* COUNTDOWNS */
+
+.screen-heading {
+  margin-bottom: 18px;
+}
+
+.screen-heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.add-button {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  font-size: 25px;
+}
+
+.countdown-list {
+  gap: 10px;
+}
+
+.countdown-card {
+  position: relative;
+}
+
+.countdown-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.countdown-live {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 18px;
+}
+
+.countdown-unit {
+  display: flex;
+  flex-direction: column;
+}
+
+.countdown-unit strong {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.countdown-unit span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.countdown-separator {
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 23px;
+}
+
+.countdown-date {
+  margin-top: 15px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* DAY DROPDOWN */
+
+.day-dropdown {
+  margin-top: 10px;
+
+  background: var(--panel);
+
+  border: 1px solid var(--border);
+
+  border-radius: 17px;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.25);
+}
+
+.day-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 14px 15px;
+
+  border-bottom: 1px solid var(--border);
+}
+
+.day-dropdown-header div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.day-dropdown-header strong {
+  font-size: 14px;
+}
+
+.day-dropdown-header span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.day-dropdown-close {
+  width: 30px;
+  height: 30px;
+
+  border-radius: 50%;
+
+  background: var(--panel-2);
+
+  color: var(--muted);
+
+  font-size: 18px;
+}
+
+.day-dropdown-events {
+  padding: 5px 9px;
+}
+
+.day-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 6px;
+}
+
+.day-dropdown-icon {
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: rgba(111, 159, 232, 0.12);
+
+  color: var(--blue);
+}
+
+.day-dropdown-icon.holiday-icon {
+  background: rgba(114, 217, 160, 0.12);
+  color: var(--green);
+}
+
+.day-dropdown-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.day-dropdown-info strong {
+  display: block;
+
+  font-size: 13px;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-dropdown-info span {
+  display: block;
+
+  margin-top: 2px;
+
+  color: var(--muted);
+
+  font-size: 11px;
+}
+
+.day-event-delete {
+  width: 28px;
+  height: 28px;
+
+  border-radius: 50%;
+
+  background: transparent;
+
+  color: var(--muted);
+
+  font-size: 17px;
+}
+
+.day-dropdown-add {
+  width: calc(100% - 20px);
+
+  margin: 3px 10px 10px;
+
+  padding: 9px;
+
+  border-radius: 10px;
+
+  background: var(--panel-2);
+
+  color: var(--muted);
+
+  font-size: 12px;
+}
+
+/* BOTTOM NAV */
+
+.bottom-nav {
+  position: fixed;
+
+  z-index: 50;
+
+  bottom: 14px;
+
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  width: calc(100% - 28px);
+
+  max-width: 500px;
+
+  height: 66px;
+
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  padding: 5px;
+
+  background: rgba(11, 17, 29, 0.95);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  border: 1px solid var(--border);
+
+  border-radius: 20px;
+
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.4);
+}
+
+.nav-tab {
+  background: transparent;
+
+  border-radius: 15px;
+
+  color: var(--muted);
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 3px;
+}
+
+.nav-tab span {
+  font-size: 20px;
+}
+
+.nav-tab label {
+  font-size: 10px;
+}
+
+.nav-tab.active {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+/* EMPTY */
+
+.empty-state {
+  padding: 25px 15px;
+
+  text-align: center;
+
+  color: var(--muted);
+
+  font-size: 13px;
+}
+
+/* MOBILE */
+
+@media (max-width: 420px) {
+  .topbar h1 {
+    font-size: 26px;
   }
 
-  events.forEach(event => {
-    const date =
-      parseDateKey(
-        event.date
-      );
-
-    const card =
-      document.createElement(
-        "button"
-      );
-
-    card.className =
-      "event-card";
-
-    card.innerHTML = `
-      <div class="event-date">
-        <strong>
-          ${date.getDate()}
-        </strong>
-
-        <span>
-          ${date.toLocaleDateString(
-            undefined,
-            {
-              month: "short"
-            }
-          )}
-        </span>
-      </div>
-
-      <div class="event-info">
-        <strong>
-          ${escapeHtml(
-            event.name
-          )}
-        </strong>
-
-        <span>
-          ${date.toLocaleDateString(
-            undefined,
-            {
-              weekday:
-                "long",
-              month:
-                "long",
-              day:
-                "numeric",
-              year:
-                "numeric"
-            }
-          )}
-          ${
-            event.time
-              ? ` · ${event.time}`
-              : ""
-          }
-        </span>
-      </div>
-    `;
-
-    card.addEventListener(
-      "click",
-      () => {
-        state.currentDate =
-          new Date(
-            date.getFullYear(),
-            date.getMonth(),
-            1
-          );
-
-        selectedDayKey =
-          formatDateKey(
-            date
-          );
-
-        renderCalendar();
-      }
-    );
-
-    upcomingEvents.appendChild(
-      card
-    );
-  });
-}
-
-/* =========================================================
-   ADD EVENT
-========================================================= */
-
-function showAddEventModal(
-  selectedDate = null
-) {
-  const defaultDate =
-    selectedDate
-      ? formatDateKey(
-          selectedDate
-        )
-      : formatDateKey(
-          getToday()
-        );
-
-  const name =
-    prompt(
-      "Event name:"
-    );
-
-  if (
-    !name ||
-    !name.trim()
-  ) {
-    return;
+  .calendar {
+    border-radius: 19px;
+    padding-left: 4px;
+    padding-right: 4px;
   }
 
-  const date =
-    prompt(
-      "Date (YYYY-MM-DD):",
-      defaultDate
-    );
-
-  if (
-    !date ||
-    !isValidDateKey(
-      date
-    )
-  ) {
-    alert(
-      "Please enter a valid date like 2026-12-25."
-    );
-
-    return;
+  .day {
+    min-height: 50px;
   }
 
-  const time =
-    prompt(
-      "Time (optional, e.g. 7:30 PM):",
-      ""
-    );
-
-  const event = {
-    id:
-      crypto.randomUUID
-        ? crypto.randomUUID()
-        : String(Date.now()),
-
-    name:
-      name.trim(),
-
-    date,
-
-    time:
-      time
-        ? time.trim()
-        : "",
-
-    createdAt:
-      new Date().toISOString(),
-
-    notification: {
-      enabled: false,
-      minutesBefore: 1440
-    }
-  };
-
-  state.events.push(
-    event
-  );
-
-  saveData();
-
-  selectedDayKey =
-    date;
-
-  const eventDate =
-    parseDateKey(
-      date
-    );
-
-  state.currentDate =
-    new Date(
-      eventDate.getFullYear(),
-      eventDate.getMonth(),
-      1
-    );
-
-  renderCalendar();
-}
-
-/* =========================================================
-   COUNTDOWN
-========================================================= */
-
-function renderCountdowns() {
-  countdownList.innerHTML =
-    "";
-
-  if (
-    state.countdowns.length ===
-    0
-  ) {
-    countdownList.innerHTML = `
-      <div class="empty-state">
-        No countdowns yet.<br>
-        Press + to create one.
-      </div>
-    `;
-
-    return;
+  .day-number {
+    width: 34px;
+    height: 34px;
   }
 
-  state.countdowns.forEach(
-    countdown => {
-      const card =
-        document.createElement(
-          "div"
-        );
-
-      card.className =
-        "countdown-card";
-
-      const target =
-        getCountdownTarget(
-          countdown
-        );
-
-      const remaining =
-        getTimeRemaining(
-          target
-        );
-
-      let days =
-        remaining.days;
-
-      let hours =
-        remaining.hours;
-
-      let minutes =
-        remaining.minutes;
-
-      let seconds =
-        remaining.seconds;
-
-      if (
-        remaining.total <= 0
-      ) {
-        days = 0;
-        hours = 0;
-        minutes = 0;
-        seconds = 0;
-      }
-
-      card.innerHTML = `
-        <h3>
-          ${escapeHtml(
-            countdown.name
-          )}
-        </h3>
-
-        <div class="countdown-live">
-          <div class="countdown-unit">
-            <strong>
-              ${days}
-            </strong>
-            <span>days</span>
-          </div>
-
-          <div class="countdown-separator">
-            :
-          </div>
-
-          <div class="countdown-unit">
-            <strong>
-              ${String(
-                hours
-              ).padStart(
-                2,
-                "0"
-              )}
-            </strong>
-            <span>hours</span>
-          </div>
-
-          <div class="countdown-separator">
-            :
-          </div>
-
-          <div class="countdown-unit">
-            <strong>
-              ${String(
-                minutes
-              ).padStart(
-                2,
-                "0"
-              )}
-            </strong>
-            <span>min</span>
-          </div>
-
-          <div class="countdown-separator">
-            :
-          </div>
-
-          <div class="countdown-unit">
-            <strong>
-              ${String(
-                seconds
-              ).padStart(
-                2,
-                "0"
-              )}
-            </strong>
-            <span>sec</span>
-          </div>
-        </div>
-
-        <div class="countdown-date">
-          ${target.toLocaleDateString(
-            undefined,
-            {
-              weekday:
-                "long",
-              month:
-                "long",
-              day:
-                "numeric",
-              year:
-                "numeric"
-            }
-          )}
-          ${
-            countdown.time
-              ? ` · ${countdown.time}`
-              : ""
-          }
-        </div>
-      `;
-
-      card.addEventListener(
-        "click",
-        () => {
-          if (
-            confirm(
-              `Delete the "${countdown.name}" countdown?`
-            )
-          ) {
-            state.countdowns =
-              state.countdowns.filter(
-                item =>
-                  item.id !==
-                  countdown.id
-              );
-
-            saveData();
-
-            renderCountdowns();
-          }
-        }
-      );
-
-      countdownList.appendChild(
-        card
-      );
-    }
-  );
-}
-
-function getCountdownTarget(
-  countdown
-) {
-  const date =
-    parseDateKey(
-      countdown.date
-    );
-
-  /*
-    If a countdown has a time,
-    use that time.
-
-    Otherwise it targets midnight
-    at the start of the selected date.
-  */
-
-  if (
-    countdown.time &&
-    /^\d{1,2}:\d{2}$/.test(
-      countdown.time
-    )
-  ) {
-    const [
-      hours,
-      minutes
-    ] =
-      countdown.time
-        .split(":")
-        .map(Number);
-
-    date.setHours(
-      hours,
-      minutes,
-      0,
-      0
-    );
-  } else {
-    date.setHours(
-      0,
-      0,
-      0,
-      0
-    );
+  .countdown-unit strong {
+    font-size: 21px;
   }
 
-  return date;
+  .countdown-separator {
+    font-size: 16px;
+  }
 }
 
-function getTimeRemaining(
-  target
-) {
-  const now =
-    new Date();
+/* DESKTOP */
 
-  const difference =
-    target.getTime() -
-    now.getTime();
-
-  if (
-    difference <= 0
-  ) {
-    return {
-      total: 0,
-      days: 0,
-      hours: 0,
-      minutes: 0,
-      seconds: 0
-    };
+@media (min-width: 701px) {
+  #app {
+    padding-top: 20px;
   }
 
-  const totalSeconds =
-    Math.floor(
-      difference / 1000
-    );
-
-  const days =
-    Math.floor(
-      totalSeconds /
-        86400
-    );
-
-  const hours =
-    Math.floor(
-      (totalSeconds %
-        86400) /
-        3600
-    );
-
-  const minutes =
-    Math.floor(
-      (totalSeconds %
-        3600) /
-        60
-    );
-
-  const seconds =
-    totalSeconds % 60;
-
-  return {
-    total: difference,
-    days,
-    hours,
-    minutes,
-    seconds
-  };
-}
-
-function addCountdown() {
-  const allEvents =
-    getAllEvents();
-
-  let choice =
-    prompt(
-      "Countdown name:\n\n" +
-      "Enter the name of an existing calendar event, " +
-      "or enter a new countdown name."
-    );
-
-  if (
-    !choice ||
-    !choice.trim()
-  ) {
-    return;
+  .bottom-nav {
+    bottom: 24px;
   }
 
-  choice =
-    choice.trim();
-
-  const matchingEvent =
-    allEvents.find(
-      event =>
-        event.name.toLowerCase() ===
-        choice.toLowerCase()
-    );
-
-  let date;
-  let time = "";
-
-  if (matchingEvent) {
-    date =
-      matchingEvent.date;
-
-    time =
-      matchingEvent.time ||
-      "";
-
-    if (!time) {
-      const enteredTime =
-        prompt(
-          "Countdown time (optional, e.g. 7:30 PM):",
-          ""
-        );
-
-      if (
-        enteredTime
-      ) {
-        time =
-          enteredTime.trim();
-      }
-    }
-  } else {
-    date =
-      prompt(
-        "Date for the countdown (YYYY-MM-DD):"
-      );
-
-    if (
-      !date ||
-      !isValidDateKey(
-        date
-      )
-    ) {
-      alert(
-        "Please enter a valid date like 2026-12-25."
-      );
-
-      return;
-    }
-
-    time =
-      prompt(
-        "Time (optional, e.g. 7:30 PM):",
-        ""
-      ) || "";
-
-    time =
-      time.trim();
+  .day {
+    min-height: 65px;
   }
-
-  state.countdowns.push({
-    id:
-      crypto.randomUUID
-        ? crypto.randomUUID()
-        : String(Date.now()),
-
-    name: choice,
-
-    date,
-
-    time,
-
-    eventId:
-      matchingEvent
-        ? matchingEvent.id
-        : null
-  });
-
-  saveData();
-
-  renderCountdowns();
 }
-
-/* =========================================================
-   VALIDATION
-========================================================= */
-
-function isValidDateKey(
-  value
-) {
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(
-      value
-    )
-  ) {
-    return false;
-  }
-
-  const date =
-    parseDateKey(
-      value
-    );
-
-  return (
-    !Number.isNaN(
-      date.getTime()
-    ) &&
-    formatDateKey(
-      date
-    ) === value
-  );
-}
-
-function escapeHtml(
-  value
-) {
-  const div =
-    document.createElement(
-      "div"
-    );
-
-  div.textContent =
-    value;
-
-  return div.innerHTML;
-}
-
-/* =========================================================
-   MONTH NAVIGATION
-========================================================= */
-
-function goToPreviousMonth() {
-  state.currentDate =
-    new Date(
-      state.currentDate.getFullYear(),
-      state.currentDate.getMonth() - 1,
-      1
-    );
-
-  selectedDayKey =
-    null;
-
-  renderCalendar();
-}
-
-function goToNextMonth() {
-  state.currentDate =
-    new Date(
-      state.currentDate.getFullYear(),
-      state.currentDate.getMonth() + 1,
-      1
-    );
-
-  selectedDayKey =
-    null;
-
-  renderCalendar();
-}
-
-function goToToday() {
-  state.currentDate =
-    new Date();
-
-  selectedDayKey =
-    null;
-
-  renderCalendar();
-}
-
-/* =========================================================
-   NAVIGATION
-========================================================= */
-
-function setupNavigation() {
-  document
-    .getElementById(
-      "previousMonth"
-    )
-    .addEventListener(
-      "click",
-      goToPreviousMonth
-    );
-
-  document
-    .getElementById(
-      "nextMonth"
-    )
-    .addEventListener(
-      "click",
-      goToNextMonth
-    );
-
-  document
-    .getElementById(
-      "todayButton"
-    )
-    .addEventListener(
-      "click",
-      goToToday
-    );
-
-  document
-    .getElementById(
-      "addEventButton"
-    )
-    .addEventListener(
-      "click",
-      () =>
-        showAddEventModal()
-    );
-
-  document
-    .getElementById(
-      "addCountdownButton"
-    )
-    .addEventListener(
-      "click",
-      addCountdown
-    );
-}
-
-/* =========================================================
-   TABS
-========================================================= */
-
-function setupTabs() {
-  const tabs =
-    document.querySelectorAll(
-      ".nav-tab"
-    );
-
-  const screens =
-    document.querySelectorAll(
-      ".screen"
-    );
-
-  tabs.forEach(tab => {
-    tab.addEventListener(
-      "click",
-      () => {
-        const screenId =
-          tab.dataset.screen;
-
-        tabs.forEach(
-          item =>
-            item.classList.remove(
-              "active"
-            )
-        );
-
-        screens.forEach(
-          screen =>
-            screen.classList.remove(
-              "active"
-            )
-        );
-
-        tab.classList.add(
-          "active"
-        );
-
-        document
-          .getElementById(
-            screenId
-          )
-          .classList.add(
-            "active"
-          );
-
-        if (
-          screenId ===
-          "countdownScreen"
-        ) {
-          renderCountdowns();
-        }
-      }
-    );
-  });
-}
-
-/* =========================================================
-   SWIPE
-========================================================= */
-
-function setupSwipe() {
-  let startX = 0;
-  let startY = 0;
-
-  calendarGrid.addEventListener(
-    "touchstart",
-    event => {
-      const touch =
-        event.changedTouches[0];
-
-      startX =
-        touch.screenX;
-
-      startY =
-        touch.screenY;
-    },
-    {
-      passive: true
-    }
-  );
-
-  calendarGrid.addEventListener(
-    "touchend",
-    event => {
-      const touch =
-        event.changedTouches[0];
-
-      const differenceX =
-        touch.screenX -
-        startX;
-
-      const differenceY =
-        touch.screenY -
-        startY;
-
-      if (
-        Math.abs(
-          differenceX
-        ) < 60 ||
-        Math.abs(
-          differenceX
-        ) <
-          Math.abs(
-            differenceY
-          )
-      ) {
-        return;
-      }
-
-      selectedDayKey =
-        null;
-
-      if (
-        differenceX < 0
-      ) {
-        goToNextMonth();
-      } else {
-        goToPreviousMonth();
-      }
-    },
-    {
-      passive: true
-    }
-  );
-}
-
-/* =========================================================
-   NOTIFICATIONS
-========================================================= */
-
-function setupNotifications() {
-  if (
-    !("Notification" in window)
-  ) {
-    return;
-  }
-
-  document
-    .getElementById(
-      "settingsButton"
-    )
-    .addEventListener(
-      "click",
-      async () => {
-        if (
-          Notification.permission ===
-          "default"
-        ) {
-          const permission =
-            await Notification.requestPermission();
-
-          if (
-            permission ===
-            "granted"
-          ) {
-            alert(
-              "Notifications are enabled."
-            );
-          }
-        } else if (
-          Notification.permission ===
-          "granted"
-        ) {
-          alert(
-            "Notifications are already enabled."
-          );
-        } else {
-          alert(
-            "Notifications are blocked. You can enable them in your browser settings."
-          );
-        }
-      }
-    );
-}
-
-/* =========================================================
-   INITIALIZE
-========================================================= */
-
-function initialize() {
-  loadData();
-
-  setupNavigation();
-  setupTabs();
-  setupSwipe();
-  setupNotifications();
-
-  renderCalendar();
-  renderCountdowns();
-
-  /*
-    Update countdowns every second.
-  */
-
-  setInterval(() => {
-    renderCountdowns();
-  }, 1000);
-}
-
-initialize();
